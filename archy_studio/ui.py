@@ -269,6 +269,16 @@ class MainWindow(QMainWindow):
         self.notice.setWordWrap(True)
         cl.addWidget(self.notice)
         cl.addStretch(1)
+        # Preserve the form's minimum width including the native scrollbar.
+        # Font metrics and scrollbars differ between Windows and Linux.
+        config.ensurePolished()
+        cl.activate()
+        scroll.ensurePolished()
+        scroll.setMinimumWidth(max(
+            390, config.minimumSizeHint().width()
+            + scroll.verticalScrollBar().sizeHint().width()
+            + 2 * scroll.frameWidth() + 4,
+        ))
         QWidget.setTabOrder(self.program, locate)
         QWidget.setTabOrder(locate, verify)
         QWidget.setTabOrder(verify, self.region)

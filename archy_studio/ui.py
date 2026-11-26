@@ -5,38 +5,129 @@ from collections import defaultdict
 from pathlib import Path
 
 from PySide6.QtCore import QLockFile, QProcess, QSettings, QStandardPaths, QTimer, Qt
-from PySide6.QtGui import QFont, QTextCursor
-from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFormLayout, QFrame,
+from PySide6.QtGui import QColor, QFont, QPalette, QTextCursor
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit,
-    QPushButton, QSplitter, QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
+    QPushButton, QScrollArea, QSizePolicy, QSplitter, QTabWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from .core import Job, OPERATIONS, REGIONS, executable
 from .history import History
 from .runner import Runner
 
 STYLE = '''
-QWidget { background: #151922; color: #e6eaf2; font-size: 13px; }
-QMainWindow { background: #11151d; }
-QLabel#brand { font-size: 25px; font-weight: 700; color: #f4f6fa; }
-QLabel#muted { color: #a1aec3; }
-QFrame#panel { background: #1b2130; border: 1px solid #343e52; border-radius: 8px; }
-QFrame#panel QLabel { background: transparent; }
-QPushButton, QLineEdit, QComboBox { background: #222b3b; border: 1px solid #3d4961; border-radius: 5px; padding: 8px; }
-QPushButton:hover { background: #34415b; } QPushButton:disabled { color: #727e92; background: #1d2430; }
-QPushButton#primary { background: #5145c4; color: white; font-weight: 600; }
-QPushButton#primary:hover { background: #675be0; }
-QPlainTextEdit, QTableWidget { background: #10151d; border: 1px solid #343e52; border-radius: 5px; gridline-color: #30394a; }
-QHeaderView::section { background: #262f40; color: #c6d0e1; padding: 7px; border: none; }
-QTabBar::tab { padding: 10px 18px; background: #202838; } QTabBar::tab:selected { background: #403798; }
-QTabWidget::pane { border: 1px solid #343e52; }
-QSplitter::handle { background: #343e52; }
+/* Define os estados explicitamente; não depende do tema claro/escuro do Windows. */
+QWidget { color: #e5edf7; font-size: 14px; }
+QMainWindow, QWidget#workspace { background: #0f1724; }
+QLabel { background: transparent; }
+QLabel#brand { font-size: 27px; font-weight: 700; color: #f8fafc; }
+QLabel#muted { color: #b4c1d4; font-size: 12px; }
+QLabel#sectionTitle { color: #f1f5f9; font-size: 17px; font-weight: 700; }
+QLabel#fieldLabel { color: #e2e8f0; font-size: 14px; font-weight: 600; }
+QLabel#sectionCaption { color: #a9bad1; font-size: 12px; }
+QLabel#operationWarning { color: #fcd48a; font-size: 12px; padding: 8px; background: #2c241a; border-radius: 6px; }
+QFrame#panel { background: #182333; border: 1px solid #34445a; border-radius: 10px; }
+QLineEdit, QComboBox {
+    background-color: #0d1624; color: #f8fafc; border: 1px solid #62748d;
+    border-radius: 6px; padding: 8px 11px; font-size: 14px;
+    selection-background-color: #3156a5; selection-color: #ffffff;
+}
+QLineEdit:hover, QComboBox:hover { border-color: #93a9c4; }
+QLineEdit:focus, QComboBox:focus { border: 2px solid #85aaff; padding: 7px 10px; }
+QLineEdit:disabled, QComboBox:disabled { background-color: #243044; color: #a3b2c7; border-color: #425168; }
+QComboBox { padding-right: 36px; }
+QComboBox:focus { padding-right: 35px; }
+QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right;
+    width: 30px; border-left: 1px solid #62748d; background: #26364e;
+    border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+QComboBox QAbstractItemView { background-color: #1e2b40; color: #f8fafc;
+    border: 1px solid #7085a3; padding: 4px; outline: 0;
+    selection-background-color: #3156a5; selection-color: #ffffff; }
+QComboBox QAbstractItemView::item { padding: 8px 10px; min-height: 22px; }
+QPushButton { background-color: #29394f; color: #f1f5f9; border: 1px solid #536783;
+    border-radius: 6px; padding: 8px 12px; font-weight: 600; }
+QPushButton:hover { background-color: #384c68; border-color: #8098b9; }
+QPushButton:focus { border: 2px solid #85aaff; padding: 7px 11px; }
+QPushButton:pressed { background-color: #1b2a40; }
+QPushButton:disabled { color: #a0aec0; background-color: #202b3a; border-color: #364359; }
+QPushButton#primary { background-color: #3156a5; border-color: #688bea; color: #ffffff; }
+QPushButton#primary:hover { background-color: #3d65b8; }
+QPushButton#primary:focus { border-color: #bed1ff; }
+QPlainTextEdit, QTableWidget { background-color: #0d1624; color: #e5edf7; border: 1px solid #455771;
+    border-radius: 6px; gridline-color: #334155; selection-background-color: #3156a5;
+    selection-color: #ffffff; alternate-background-color: #142033; }
+QPlainTextEdit { padding: 8px; }
+QHeaderView::section { background-color: #26364d; color: #dbe7f7; padding: 9px 6px; border: none; border-bottom: 1px solid #536783; font-weight: 600; }
+QTabBar::tab { padding: 11px 24px; background-color: #202d40; color: #bdcce0; border-bottom: 2px solid transparent; }
+QTabBar::tab:selected { background-color: #2a3c57; color: #ffffff; border-bottom: 2px solid #85aaff; }
+QTabBar::tab:focus { color: #ffffff; }
+QTabWidget::pane { border: 1px solid #34445a; }
+QSplitter::handle { background-color: #34445a; }
+QScrollArea { background: transparent; border: none; }
+QScrollBar:vertical { background: #142033; width: 12px; margin: 0; }
+QScrollBar::handle:vertical { background: #62748d; min-height: 28px; border-radius: 5px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+QToolTip { background-color: #26364e; color: #ffffff; border: 1px solid #93a9c4; padding: 5px; }
 '''
+
+
+def apply_theme(app):
+    app.setStyle('Fusion')
+    palette = QPalette()
+    colors = {
+        'Window': '#0f1724', 'WindowText': '#e5edf7', 'Base': '#0d1624',
+        'AlternateBase': '#142033', 'Text': '#f8fafc', 'Button': '#29394f',
+        'ButtonText': '#f1f5f9', 'PlaceholderText': '#a9bad1',
+        'Highlight': '#3156a5', 'HighlightedText': '#ffffff',
+        'ToolTipBase': '#26364e', 'ToolTipText': '#ffffff',
+    }
+    for name, value in colors.items():
+        palette.setColor(getattr(QPalette.ColorRole, name), QColor(value))
+    app.setPalette(palette)
+    app.setStyleSheet(STYLE)
+
+
+def heading(text, name='sectionTitle'):
+    w = label(text)
+    w.setObjectName(name)
+    return w
+
+
+def field(layout, title, widget, control=None, hint=None):
+    caption = heading(title, 'fieldLabel')
+    target = control if control is not None else widget
+    caption.setBuddy(target)
+    target.setAccessibleName(title)
+    target.setMinimumHeight(42)
+    target.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    layout.addWidget(caption)
+    if control is None:
+        layout.addWidget(widget)
+    else:
+        layout.addLayout(widget)
+    if hint:
+        note = heading(hint, 'sectionCaption')
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        target.setAccessibleDescription(hint)
+
+
+def field_row(control, *buttons):
+    row = QHBoxLayout()
+    row.setSpacing(7)
+    row.addWidget(control, 1)
+    for action in buttons:
+        row.addWidget(action)
+    return row
+
 
 
 def button(text, callback, primary=False):
     b = QPushButton(text)
     if primary:
         b.setObjectName('primary')
+    b.setMinimumHeight(38)
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
     b.clicked.connect(callback)
     return b
 
@@ -53,7 +144,8 @@ def panel():
     w = QFrame()
     w.setObjectName('panel')
     l = QVBoxLayout(w)
-    l.setContentsMargins(14, 14, 14, 14)
+    l.setContentsMargins(16, 16, 16, 16)
+    l.setSpacing(9)
     return w, l
 
 
@@ -63,6 +155,8 @@ def table(headers):
     t.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
     t.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     t.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+    t.setAlternatingRowColors(True)
+    t.verticalHeader().setDefaultSectionSize(34)
     t.verticalHeader().hide()
     t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     return t
@@ -72,8 +166,8 @@ class MainWindow(QMainWindow):
     def __init__(self, data_dir):
         super().__init__()
         self.setWindowTitle('Sueth Archy Studio | 0.1.0')
-        self.resize(1100, 760)
-        self.setMinimumSize(760, 590)
+        self.resize(1280, 820)
+        self.setMinimumSize(900, 600)
         self.settings = QSettings('Sueth', 'ArchyStudio')
         self.history = History(data_dir / 'history.sqlite3')
         self.runner = Runner(self.history, self)
@@ -82,42 +176,125 @@ class MainWindow(QMainWindow):
         self.runner.log.connect(self._log)
         self.runner.state.connect(self._state)
         self.runner.changed.connect(self._changed)
-        root = QWidget(); self.setCentralWidget(root)
-        layout = QVBoxLayout(root); layout.setContentsMargins(20, 16, 20, 16)
+        root = QWidget()
+        root.setObjectName('workspace')
+        self.setCentralWidget(root)
+        layout = QVBoxLayout(root)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
         top = QHBoxLayout()
-        brand = label('Sueth Archy Studio'); brand.setObjectName('brand'); top.addWidget(brand)
-        top.addStretch(); self.version = label('Archy: não verificado', True); top.addWidget(self.version)
+        brand = label('Sueth Archy Studio')
+        brand.setObjectName('brand')
+        top.addWidget(brand)
+        top.addStretch()
+        self.version = label('Archy: não verificado', True)
+        self.version.setWordWrap(True)
+        self.version.setMaximumWidth(360)
+        top.addWidget(self.version)
         layout.addLayout(top)
-        layout.addWidget(label('ARCHITECT  /  FERRAMENTA LOCAL  /  v0.1.0', True))
-        tabs = QTabWidget(); layout.addWidget(tabs, 1)
-        work = QWidget(); tabs.addTab(work, 'Executar'); wl = QVBoxLayout(work)
-        config, cl = panel(); wl.addWidget(config)
-        form = QFormLayout(); cl.addLayout(form)
-        self.program = QLineEdit(self.settings.value('program', '', type=str)); self.program.setPlaceholderText('Detectar pelo PATH ou selecionar archy.exe')
-        pl = QHBoxLayout(); pl.addWidget(self.program, 1); pl.addWidget(button('Localizar', self._browse_program)); pl.addWidget(button('Verificar', self._detect)); form.addRow('Archy', pl)
+        layout.addWidget(label('ARCHITECT  /  WORKSPACE LOCAL  /  v0.1.0', True))
+        tabs = QTabWidget()
+        layout.addWidget(tabs, 1)
+        work = QWidget()
+        tabs.addTab(work, 'Executar')
+        wl = QHBoxLayout(work)
+        wl.setContentsMargins(12, 12, 12, 12)
+        workspace = QSplitter(Qt.Orientation.Horizontal)
+        workspace.setChildrenCollapsible(False)
+        workspace.setHandleWidth(8)
+        wl.addWidget(workspace)
+        # A configuração tem largura própria e rolagem, sem disputar altura com os logs.
+        scroll = QScrollArea()
+        scroll.setObjectName('configurationScroll')
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(390)
+        config, cl = panel()
+        scroll.setWidget(config)
+        workspace.addWidget(scroll)
+        cl.addWidget(heading('01  Configuração'))
+        desc = heading('Escolha o executável e a organização de destino.', 'sectionCaption')
+        desc.setWordWrap(True)
+        cl.addWidget(desc)
+        self.program = QLineEdit(self.settings.value('program', '', type=str))
+        self.program.setPlaceholderText('Archy no PATH ou caminho do archy.exe')
+        self.program.setMinimumWidth(100)
+        locate = button('Localizar', self._browse_program)
+        verify = button('Verificar', self._detect)
+        field(cl, 'Executável Archy', field_row(self.program, locate, verify), self.program)
         self.region = QComboBox()
-        for title, domain in REGIONS.items(): self.region.addItem(f'{title} — {domain}', domain)
+        self.region.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.region.setMinimumContentsLength(16)
+        for title, domain in REGIONS.items():
+            self.region.addItem(f'{title} — {domain}', domain)
         saved = self.region.findData(self.settings.value('region', REGIONS['São Paulo']))
-        self.region.setCurrentIndex(max(saved, 0)); form.addRow('Região', self.region)
-        self.kind = QComboBox(); self.kind.addItem('User Token (PKCE / Authorization Code)', False); self.kind.addItem('Client Credentials Token', True); form.addRow('Tipo de token', self.kind)
-        self.token = QLineEdit(); self.token.setEchoMode(QLineEdit.EchoMode.Password); self.token.setPlaceholderText('Access token da sessão — não é salvo')
-        tl = QHBoxLayout(); tl.addWidget(self.token, 1); tl.addWidget(button('Limpar', self.token.clear)); form.addRow('Access token', tl)
-        self.file = QLineEdit(); self.file.setPlaceholderText('Caminho do arquivo .yaml ou .yml')
-        fl = QHBoxLayout(); fl.addWidget(self.file, 1); fl.addWidget(button('Selecionar YAML', self._browse_yaml)); form.addRow('Fluxo YAML', fl)
-        actions = QHBoxLayout(); cl.addLayout(actions)
-        for op, text in OPERATIONS.items(): actions.addWidget(button(text, lambda checked=False, op=op: self._enqueue(op), op == 'publish'))
-        self.notice = label('Uma execução por vez. CREATE e PUBLISH alteram a organização de destino.', True); cl.addWidget(self.notice)
-        splitter = QSplitter(Qt.Orientation.Vertical); wl.addWidget(splitter, 1)
+        self.region.setCurrentIndex(max(saved, 0))
+        field(cl, 'Região Genesys Cloud', self.region)
+        self.kind = QComboBox()
+        self.kind.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.kind.setMinimumContentsLength(16)
+        self.kind.addItem('User Token (PKCE / Authorization Code)', False)
+        self.kind.addItem('Client Credentials Token', True)
+        field(cl, 'Tipo de token', self.kind)
+        self.token = QLineEdit()
+        self.token.setEchoMode(QLineEdit.EchoMode.Password)
+        self.token.setPlaceholderText('Cole o access token aqui')
+        self.token.setMinimumWidth(100)
+        clear = button('Limpar', self.token.clear)
+        field(cl, 'Access token', field_row(self.token, clear), self.token,
+              'O token fica oculto e não é salvo no histórico.')
+        cl.addSpacing(12)
+        cl.addWidget(heading('02  Fluxo YAML'))
+        self.file = QLineEdit()
+        self.file.setPlaceholderText('Selecione um arquivo .yaml ou .yml')
+        self.file.setMinimumWidth(100)
+        select = button('Selecionar', self._browse_yaml)
+        field(cl, 'Arquivo do fluxo', field_row(self.file, select), self.file)
+        cl.addSpacing(12)
+        cl.addWidget(heading('03  Operação'))
+        self.operation_buttons = {}
+        actions = QHBoxLayout()
+        actions.setSpacing(7)
+        cl.addLayout(actions)
+        for op, text in OPERATIONS.items():
+            action = button(text, lambda checked=False, op=op: self._enqueue(op), op == 'publish')
+            action.setAccessibleName(text)
+            action.setMinimumHeight(44)
+            actions.addWidget(action)
+            self.operation_buttons[op] = action
+        self.notice = heading('CREATE e PUBLISH alteram a organização de destino.', 'operationWarning')
+        self.notice.setWordWrap(True)
+        cl.addWidget(self.notice)
+        cl.addStretch(1)
+        QWidget.setTabOrder(self.program, locate)
+        QWidget.setTabOrder(locate, verify)
+        QWidget.setTabOrder(verify, self.region)
+        QWidget.setTabOrder(self.region, self.kind)
+        QWidget.setTabOrder(self.kind, self.token)
+        QWidget.setTabOrder(self.token, clear)
+        QWidget.setTabOrder(clear, self.file)
+        QWidget.setTabOrder(self.file, select)
+        QWidget.setTabOrder(select, self.operation_buttons['validateYaml'])
+        QWidget.setTabOrder(self.operation_buttons['validateYaml'], self.operation_buttons['create'])
+        QWidget.setTabOrder(self.operation_buttons['create'], self.operation_buttons['publish'])
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        splitter.setChildrenCollapsible(False)
+        splitter.setHandleWidth(8)
+        workspace.addWidget(splitter)
+        workspace.setStretchFactor(0, 0)
+        workspace.setStretchFactor(1, 1)
+        workspace.setSizes([450, 750])
         queue, ql = panel(); splitter.addWidget(queue)
-        qtop = QHBoxLayout(); qtop.addWidget(label('Fila de operações')); qtop.addStretch()
+        qtop = QHBoxLayout(); qtop.addWidget(heading('Fila de operações')); qtop.addStretch()
         self.queue_status = label('Pronta', True); qtop.addWidget(self.queue_status)
         self.resume = button('Continuar fila', self.runner.resume); qtop.addWidget(self.resume)
         qtop.addWidget(button('Remover pendente', self._remove)); ql.addLayout(qtop)
         self.jobs = table(['Operação', 'Arquivo', 'Região', 'Status']); ql.addWidget(self.jobs)
         self.jobs.itemSelectionChanged.connect(self._show_log)
         console, ol = panel(); splitter.addWidget(console)
-        ctop = QHBoxLayout(); ctop.addWidget(label('Console da operação selecionada')); ctop.addStretch(); ctop.addWidget(button('Copiar', self._copy)); ctop.addWidget(button('Salvar TXT', self._save)); ol.addLayout(ctop)
-        self.output = QPlainTextEdit(); self.output.setReadOnly(True); self.output.setFont(QFont('Consolas', 10)); ol.addWidget(self.output)
+        ctop = QHBoxLayout(); ctop.addWidget(heading('Console')); ctop.addStretch(); ctop.addWidget(button('Copiar', self._copy)); ctop.addWidget(button('Salvar TXT', self._save)); ol.addLayout(ctop)
+        ol.addWidget(label('Selecione uma execução para acompanhar os logs.', True))
+        self.output = QPlainTextEdit(); self.output.setReadOnly(True); self.output.setFont(QFont('Consolas', 11)); ol.addWidget(self.output)
         splitter.setSizes([150, 235])
         ht = QWidget(); tabs.addTab(ht, 'Histórico'); hl = QVBoxLayout(ht)
         hl.addWidget(label('Metadados locais das últimas 200 execuções. Não inclui tokens nem logs.', True)); hl.addWidget(button('Atualizar', self._refresh_history))
@@ -214,7 +391,7 @@ class MainWindow(QMainWindow):
 
 
 def main():
-    app = QApplication([]); app.setApplicationName('Sueth Archy Studio'); app.setOrganizationName('Sueth'); app.setStyle('Fusion'); app.setStyleSheet(STYLE)
+    app = QApplication([]); app.setApplicationName('Sueth Archy Studio'); app.setOrganizationName('Sueth'); apply_theme(app)
     path = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)); path.mkdir(parents=True, exist_ok=True)
     lock = QLockFile(str(path / 'studio.lock'))
     if not lock.tryLock(0):

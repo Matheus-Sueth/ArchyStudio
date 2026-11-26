@@ -1,0 +1,15 @@
+[project]
+name = "sueth-archy-studio"
+version = "0.1.0"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+dependencies = ["PySide6-Essentials>=6.8,<7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+[tool.ruff.lint]
+select = ["E9", "F"]

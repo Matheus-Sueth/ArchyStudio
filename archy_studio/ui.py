@@ -260,7 +260,10 @@ class MainWindow(QMainWindow):
             action = button(text, lambda checked=False, op=op: self._enqueue(op), op == 'publish')
             action.setAccessibleName(text)
             action.setMinimumHeight(44)
-            actions.addWidget(action)
+            if op == 'publish':
+                cl.addWidget(action)
+            else:
+                actions.addWidget(action)
             self.operation_buttons[op] = action
         self.notice = heading('CREATE e PUBLISH alteram a organização de destino.', 'operationWarning')
         self.notice.setWordWrap(True)
